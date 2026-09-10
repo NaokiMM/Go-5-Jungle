@@ -1,41 +1,51 @@
 # Go-5-Jungle
 
-現在AWSに接続しているIAMユーザーまたはロールを表示するGo CLIです。AWS SDK for Go v2の標準認証情報チェーンとSTS `GetCallerIdentity`を使い、アカウントID・ARN・ユーザーIDを取得します。AWSリソースやIAM設定は変更しません。
+## 概要
 
-## 設定
+Goを使って、AWS環境のセキュリティ設定を確認するCLIツールです。
 
-Go 1.26.4以降、有効なAWS認証情報、リージョン、AWSへのネットワーク接続が必要です。
+AWSの各サービスから設定情報を取得し、ターミナル上で確認できるようにします。
 
-SDKが環境変数、`~/.aws/config`・`~/.aws/credentials`、SSO、Web Identity、ECS・EC2ロールなどから認証情報を解決します。キーをコードに埋め込まないでください。認証情報ファイルをGitに追加しないでください。
+## 目的
 
-SSOプロファイルを準備する例（AWS CLIは設定・ログイン時のみ必要）:
+AWS環境では、IAM・S3・Security Groupなど複数のサービスにセキュリティ設定が分散しています。
 
-```sh
-aws configure sso --profile development
-aws sso login --profile development
-```
+このツールは、それらの設定情報をGoから取得し、AWS環境のセキュリティ状態を確認しやすくすることを目的としています。
 
-既存の認証情報も使用できます。環境変数で一時認証情報を設定する場合は`AWS_ACCESS_KEY_ID`・`AWS_SECRET_ACCESS_KEY`に加え`AWS_SESSION_TOKEN`が必要です。`-profile`を明示するとSDKが指定プロファイルを選択します。`AWS_PROFILE`を使う場合、環境変数のアクセスキーが優先されることがあります。実際の接続主体は出力ARNで確認してください。
+まずはIAMから実装し、対象サービスを順次追加していきます。
 
-## 実行
+## 対象サービス
 
-```sh
-go run . -profile development -region ap-northeast-1
-```
+| サービス | 確認内容 | 状況 |
+|---|---|---|
+| IAM | 接続中のIAMユーザー・ロールを確認 | 対応済み |
+| S3 | セキュリティ設定を確認 | 今後対応 |
+| Security Group | 通信ルールを確認 | 今後対応 |
+| CloudTrail | ログ設定を確認 | 今後対応 |
+| KMS | 暗号化設定を確認 | 今後対応 |
 
-認証情報とリージョンが設定済みの場合:
+## 実行方法
+
+- VS Codeでターミナルを開きます。
+- `Go-5-Jungle` ディレクトリに移動します。
+- 実行コマンドを入力します。
+- 実行結果はターミナルに表示されます。
+
+### 実行コマンド
+
+AWSの認証情報とリージョンが設定済みの場合：
 
 ```sh
 go run .
 ```
 
+AWSプロファイルとリージョンを指定する場合：
+
 ```sh
-AWS_PROFILE=development AWS_REGION=ap-northeast-1 go run .
-go run . -help
-go run . -profile development -region ap-northeast-1 -timeout 60s
+go run . -profile development -region ap-northeast-1
 ```
 
-出力例（架空の値）:
+### 実行結果の例
 
 ```text
 Account: 123456789012
@@ -43,19 +53,45 @@ ARN:     arn:aws:sts::123456789012:assumed-role/Developer/example-session
 User ID: AROAEXAMPLE:example-session
 ```
 
-`iam::…:user/…`はIAMユーザー、`sts::…:assumed-role/…`はロールとセッションを示します。SSOも通常はロールとして表示されます。
+- `Account`：接続しているAWSアカウントID
+- `ARN`：接続しているIAMユーザーまたはロール
+- `User ID`：AWS上のユーザーまたはセッションの識別子
 
-成功時は終了コード0、失敗時は標準エラー出力に説明を表示して終了コード1を返します。リージョン未設定なら`-region`または`AWS_REGION`を指定してください。認証失敗時はプロファイルや有効期限を確認し、SSOの場合は再ログインしてください。タイムアウト時はネットワークを確認してください（既定30秒）。
+## 動作確認
 
-## ビルド・検証
+`main.go` の処理が想定どおり動作するか、`main_test.go` を使って確認します。
+
+### テスト対象
+
+- 対象ディレクトリ：`Go-5-Jungle`
+- 実装コード：`main.go`
+- テストコード：`main_test.go`
+
+### テスト実行コマンド
+
+`Go-5-Jungle` ディレクトリで以下を実行します。
 
 ```sh
-go test ./...
-go vet ./...
-go build -o /tmp/go-5-jungle .
-/tmp/go-5-jungle -help
+go test .
 ```
 
-テストはローカルの模擬STSを利用し、AWS認証情報は不要です。ビルド・テストの成功だけでは実AWSへの接続成功は保証されません。有効な認証情報でCLIを実行して確認してください。
+テストに成功すると、ターミナルに `ok` と表示されます。
 
-参考: [AWS SDK for Go v2の設定](https://docs.aws.amazon.com/sdk-for-go/v2/developer-guide/configure-gosdk.html)
+## 必要な環境
+
+- Go
+- AWSの有効な認証情報
+- AWSリージョンの設定
+- AWSへ接続できるネットワーク環境
+
+SSOを利用する場合は、事前にAWSへログインしておきます。
+
+```sh
+aws sso login --profile development
+```
+
+## 補足
+
+このツールはAWSの設定やリソースを変更しません。
+
+AWSから設定情報を取得し、セキュリティ状態を確認することを目的として開発しています。
